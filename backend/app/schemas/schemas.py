@@ -7,7 +7,13 @@ class RouteOut(BaseModel):
     name: str
     max_weight_kg: float
     max_volume_l: float
+    seal_weight_kg: float | None = None
     model_config = {"from_attributes": True}
+
+
+class RouteUpdate(BaseModel):
+    # 封袋重量阈值；null 表示不启用，提交值不得大于重量上限
+    seal_weight_kg: float | None = None
 
 
 class StopOut(BaseModel):
@@ -33,6 +39,8 @@ class BagOut(BaseModel):
     bag_index: int
     weight_kg: float
     volume_l: float
+    max_weight_kg: float
+    seal_weight_kg: float | None = None
     items: list[BagItemOut] = []
     model_config = {"from_attributes": True}
 

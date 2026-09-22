@@ -250,3 +250,33 @@ button {
 }
 .fill { height: 10px; background: #2a3824; border-radius: 2px; overflow: hidden; }
 .fill > span { display: block; height: 100%; background: var(--accent); }
+
+/* —— 封袋重量阈值 —— */
+.seal-hint {
+  font-size: .85rem;
+  color: var(--text);
+  background: var(--strip);
+  border: 1px solid #3a5030;
+  border-left: 3px solid var(--route-leaf);
+  border-radius: 6px;
+  padding: .5rem .75rem;
+  margin: -.25rem 0 .9rem;
+}
+.seal-hint-sub { color: var(--route-muted); font-size: .78rem; margin-left: .35rem; }
+.bag-threshold {
+  margin-left: .75rem;
+  font-size: .72rem;
+  color: var(--route-muted);
+  border: 1px solid #3a4a32;
+  border-radius: 999px;
+  padding: .1rem .55rem;
+}
+.verify {
+  font-size: .72rem;
+  border-radius: 999px;
+  padding: .15rem .6rem;
+  white-space: nowrap;
+}
+.verify-seal { background: rgba(182, 227, 86, .18); color: var(--route-leaf); border: 1px solid #5a7a3a; }
+.verify-muted { color: var(--route-muted); border: 1px solid #3a4a32; }
+.verify-bad { background: rgba(217, 108, 74, .18); color: var(--reject); border: 1px solid var(--reject); }
