@@ -229,6 +229,13 @@ button {
 }
 .mono { font-family: "IBM Plex Mono", monospace; }
 .err { color: #ff9b7a; } .ok { color: #b6e356; }
+.threshold-input { width: 7rem; padding: .3rem .5rem; }
+.muted-note { color: var(--route-muted); font-size: .8rem; margin-top: .75rem; }
+.threshold-note { color: var(--route-muted); font-size: .85rem; margin: .25rem 0 .75rem; }
+.sealed-tag {
+  margin-left: .5rem; padding: .1rem .45rem; border-radius: 999px;
+  background: var(--route-leaf); color: #142008; font-size: .7rem; font-weight: 700;
+}
 
 /* page helpers — no card-grid dashboard */
 .route-strip {

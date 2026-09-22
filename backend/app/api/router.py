@@ -10,12 +10,52 @@ from app.schemas.schemas import (
     PackRequest,
     RejectOut,
     RouteOut,
+    RouteUpdate,
     StopOut,
     WeightOut,
 )
 from app.services.pack_engine import StopItem, pack_route
 
 api_router = APIRouter()
+
+_EPS = 1e-9
+
+
+def route_out(route: DeliveryRoute) -> RouteOut:
+    return RouteOut(
+        id=route.id,
+        name=route.name,
+        max_weight_kg=route.max_weight_kg,
+        max_volume_l=route.max_volume_l,
+        seal_threshold_kg=route.effective_seal_threshold_kg,
+    )
+
+
+def bag_out(db: Session, bag: PackBag, route: DeliveryRoute) -> BagOut:
+    items = db.scalars(select(BagItem).where(BagItem.bag_id == bag.id)).all()
+    threshold = (
+        bag.seal_threshold_kg
+        if bag.seal_threshold_kg is not None
+        else route.effective_seal_threshold_kg
+    )
+    return BagOut(
+        id=bag.id,
+        route_id=bag.route_id,
+        bag_index=bag.bag_index,
+        weight_kg=bag.weight_kg,
+        volume_l=bag.volume_l,
+        seal_threshold_kg=threshold,
+        max_weight_kg=route.max_weight_kg,
+        items=[
+            BagItemOut(
+                stop_id=i.stop_id,
+                stop_name=i.stop_name,
+                weight_kg=i.weight_kg,
+                volume_l=i.volume_l,
+            )
+            for i in items
+        ],
+    )
 
 
 @api_router.get("/health")
@@ -25,7 +65,37 @@ def health():
 
 @api_router.get("/routes", response_model=list[RouteOut])
 def routes(db: Session = Depends(get_db)):
-    return db.scalars(select(DeliveryRoute).order_by(DeliveryRoute.id)).all()
+    rows = db.scalars(select(DeliveryRoute).order_by(DeliveryRoute.id)).all()
+    return [route_out(r) for r in rows]
+
+
+@api_router.patch("/routes/{route_id}", response_model=RouteOut)
+def update_route(route_id: int, body: RouteUpdate, db: Session = Depends(get_db)):
+    route = db.get(DeliveryRoute, route_id)
+    if not route:
+        raise HTTPException(404, "路线不存在")
+    max_weight = body.max_weight_kg if body.max_weight_kg is not None else route.max_weight_kg
+    max_volume = body.max_volume_l if body.max_volume_l is not None else route.max_volume_l
+    if body.seal_threshold_kg is not None:
+        threshold = body.seal_threshold_kg
+    else:
+        # 未显式设置时保持原值；NULL 表示不启用（跟随重量上限）
+        threshold = route.seal_threshold_kg
+    if max_weight <= 0:
+        raise HTTPException(400, "重量上限必须大于 0")
+    if max_volume <= 0:
+        raise HTTPException(400, "体积上限必须大于 0")
+    if threshold is not None:
+        if threshold <= 0:
+            raise HTTPException(400, "封袋阈值必须大于 0")
+        if threshold > max_weight + _EPS:
+            raise HTTPException(400, f"封袋阈值不能大于重量上限（{threshold}>{max_weight}）")
+    route.max_weight_kg = max_weight
+    route.max_volume_l = max_volume
+    route.seal_threshold_kg = threshold
+    db.commit()
+    db.refresh(route)
+    return route_out(route)
 
 
 @api_router.get("/stops", response_model=list[StopOut])
@@ -58,7 +128,8 @@ def pack(body: PackRequest, db: Session = Depends(get_db)):
     items = [
         StopItem(s.id, s.seq, s.weight_kg, s.volume_l, s.name) for s in stops
     ]
-    result = pack_route(items, route.max_weight_kg, route.max_volume_l)
+    threshold = route.effective_seal_threshold_kg
+    result = pack_route(items, route.max_weight_kg, route.max_volume_l, seal_threshold=threshold)
     out_bags: list[PackBag] = []
     for bag in result.bags:
         row = PackBag(
@@ -66,6 +137,7 @@ def pack(body: PackRequest, db: Session = Depends(get_db)):
             bag_index=bag.bag_index,
             weight_kg=round(bag.weight_kg, 3),
             volume_l=round(bag.volume_l, 3),
+            seal_threshold_kg=threshold,
         )
         db.add(row)
         db.flush()
@@ -90,25 +162,7 @@ def pack(body: PackRequest, db: Session = Depends(get_db)):
             )
         )
     db.commit()
-    return [
-        BagOut(
-            id=b.id,
-            route_id=b.route_id,
-            bag_index=b.bag_index,
-            weight_kg=b.weight_kg,
-            volume_l=b.volume_l,
-            items=[
-                BagItemOut(
-                    stop_id=i.stop_id,
-                    stop_name=i.stop_name,
-                    weight_kg=i.weight_kg,
-                    volume_l=i.volume_l,
-                )
-                for i in db.scalars(select(BagItem).where(BagItem.bag_id == b.id)).all()
-            ],
-        )
-        for b in out_bags
-    ]
+    return [bag_out(db, b, route) for b in out_bags]
 
 
 @api_router.get("/bags", response_model=list[BagOut])
@@ -116,25 +170,9 @@ def bags(db: Session = Depends(get_db)):
     rows = db.scalars(select(PackBag).order_by(PackBag.route_id, PackBag.bag_index)).all()
     out = []
     for b in rows:
-        items = db.scalars(select(BagItem).where(BagItem.bag_id == b.id)).all()
-        out.append(
-            BagOut(
-                id=b.id,
-                route_id=b.route_id,
-                bag_index=b.bag_index,
-                weight_kg=b.weight_kg,
-                volume_l=b.volume_l,
-                items=[
-                    BagItemOut(
-                        stop_id=i.stop_id,
-                        stop_name=i.stop_name,
-                        weight_kg=i.weight_kg,
-                        volume_l=i.volume_l,
-                    )
-                    for i in items
-                ],
-            )
-        )
+        route = db.get(DeliveryRoute, b.route_id)
+        assert route
+        out.append(bag_out(db, b, route))
     return out
 
 

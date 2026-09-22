@@ -7,8 +7,9 @@ from app.models.models import DeliveryRoute, SubscriberStop
 def seed_if_empty(db: Session) -> None:
     if db.scalar(select(DeliveryRoute.id).limit(1)):
         return
-    r1 = DeliveryRoute(name="城东晨线", max_weight_kg=8.0, max_volume_l=18.0)
-    r2 = DeliveryRoute(name="园区午线", max_weight_kg=6.0, max_volume_l=14.0)
+    # 城东晨线：阈值 2.2kg，第一站（2.2kg）装完即达阈封袋，第二站起开新袋
+    r1 = DeliveryRoute(name="城东晨线", max_weight_kg=8.0, max_volume_l=18.0, seal_threshold_kg=2.2)
+    r2 = DeliveryRoute(name="园区午线", max_weight_kg=6.0, max_volume_l=14.0, seal_threshold_kg=3.5)
     db.add_all([r1, r2])
     db.flush()
     db.add_all(

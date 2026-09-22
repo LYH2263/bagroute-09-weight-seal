@@ -12,7 +12,17 @@ class DeliveryRoute(Base):
     name: Mapped[str] = mapped_column(String(80), unique=True)
     max_weight_kg: Mapped[float] = mapped_column(Float, default=8.0)
     max_volume_l: Mapped[float] = mapped_column(Float, default=20.0)
+    # 封袋阈值：袋重达到该值即封袋开新袋；NULL 表示不启用（等同重量上限）
+    seal_threshold_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     stops: Mapped[list["SubscriberStop"]] = relationship(back_populates="route")
+
+    @property
+    def effective_seal_threshold_kg(self) -> float:
+        return (
+            self.seal_threshold_kg
+            if self.seal_threshold_kg is not None
+            else self.max_weight_kg
+        )
 
 
 class SubscriberStop(Base):
@@ -33,6 +43,8 @@ class PackBag(Base):
     bag_index: Mapped[int] = mapped_column(Integer)
     weight_kg: Mapped[float] = mapped_column(Float)
     volume_l: Mapped[float] = mapped_column(Float)
+    # 本次装袋实际使用的封袋阈值快照
+    seal_threshold_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     items: Mapped[list["BagItem"]] = relationship(back_populates="bag")
 

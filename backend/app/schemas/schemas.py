@@ -7,7 +7,14 @@ class RouteOut(BaseModel):
     name: str
     max_weight_kg: float
     max_volume_l: float
+    seal_threshold_kg: float
     model_config = {"from_attributes": True}
+
+
+class RouteUpdate(BaseModel):
+    max_weight_kg: float | None = None
+    max_volume_l: float | None = None
+    seal_threshold_kg: float | None = None
 
 
 class StopOut(BaseModel):
@@ -33,6 +40,8 @@ class BagOut(BaseModel):
     bag_index: int
     weight_kg: float
     volume_l: float
+    seal_threshold_kg: float
+    max_weight_kg: float
     items: list[BagItemOut] = []
     model_config = {"from_attributes": True}
 
